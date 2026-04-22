@@ -1,0 +1,59 @@
+name: Cape Town Weather Bot
+
+on:
+  schedule:
+    # GitHub Actions uses UTC. Cape Town is UTC+2 (SAST).
+    # 06:00 SAST = 04:00 UTC
+    # 18:00 SAST = 16:00 UTC
+    - cron: "0 4 * * *"   # Morning post — 06:00 SAST
+    - cron: "0 16 * * *"  # Evening post — 18:00 SAST
+
+  # Allow manual trigger from the GitHub Actions UI (useful for testing)
+  workflow_dispatch:
+    inputs:
+      time_of_day:
+        description: "morning or evening"
+        required: true
+        default: "morning"
+
+jobs:
+  post-weather:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Determine morning vs evening based on which cron fired.
+      # UTC hour 4  → morning, UTC hour 16 → evening.
+      # For manual runs, use the workflow_dispatch input.
+      - name: Determine time of day
+        id: tod
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "TOD=${{ github.event.inputs.time_of_day }}" >> $GITHUB_OUTPUT
+          else
+            HOUR=$(date -u +"%H")
+            if [ "$HOUR" = "04" ]; then
+              echo "TOD=morning" >> $GITHUB_OUTPUT
+            else
+              echo "TOD=evening" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Post weather tweet
+        env:
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+        run: python main.py ${{ steps.tod.outputs.TOD }}
