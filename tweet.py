@@ -69,6 +69,22 @@ def compose_tweet(weather: dict, time_of_day: str, uv: float = None,
     return tweet
 
 
+def compose_week_ahead_tweet(forecast: list) -> str:
+    """Build a Sunday week-ahead forecast tweet."""
+    lines = ["📅 Good morning, Cape Town! Here's your week ahead:\n"]
+    for day in forecast:
+        lines.append(
+            f"{day['emoji']} {day['day_name']}: {day['min']}–{day['max']}°C, {day['desc']}"
+        )
+    lines.append("\nPlan your week like a local. 🌍")
+    lines.append("\n#CapeTown #WeatherZA #CTWeather")
+
+    tweet = "\n".join(lines)
+    if len(tweet) > 280:
+        tweet = tweet[:277] + "..."
+    return tweet
+
+
 def compose_weekend_tweet(forecast: list) -> str:
     """Build a Friday weekend forecast tweet from 3-day forecast data."""
     lines = ["🗓️ Weekend forecast for Cape Town:\n"]

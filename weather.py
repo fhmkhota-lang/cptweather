@@ -223,3 +223,52 @@ def parse_weather(data: dict) -> dict:
         "sunrise": fmt_time(sunrise_utc),
         "sunset": fmt_time(sunset_utc),
     }
+
+
+def get_week_ahead(forecast_data: dict) -> list | None:
+    """Extract Mon–Fri daily summaries for the Sunday week-ahead tweet."""
+    if not forecast_data:
+        return None
+
+    from collections import defaultdict
+    daily = defaultdict(list)
+
+    for item in forecast_data.get("list", []):
+        dt = datetime.fromtimestamp(item["dt"], tz=timezone.utc)
+        daily[dt.date()].append(item)
+
+    today = datetime.now(tz=timezone.utc).date()
+    days = sorted(k for k in daily.keys() if k > today)[:5]
+
+    results = []
+    for day in days:
+        items = daily[day]
+        temps = [i["main"]["temp"] for i in items]
+        conditions = [i["weather"][0]["id"] for i in items]
+        descriptions = [i["weather"][0]["description"] for i in items]
+
+        # Most severe condition of the day
+        min_cond = min(conditions)
+        idx = conditions.index(min_cond)
+        desc = descriptions[idx].capitalize()
+
+        if min_cond < 300:
+            emoji = "⛈️"
+        elif min_cond < 600:
+            emoji = "🌧️"
+        elif min_cond < 800:
+            emoji = "🌫️"
+        elif min_cond == 800:
+            emoji = "☀️"
+        else:
+            emoji = "⛅"
+
+        results.append({
+            "day_name": day.strftime("%A"),
+            "min": round(min(temps)),
+            "max": round(max(temps)),
+            "desc": desc,
+            "emoji": emoji,
+        })
+
+    return results if results else None

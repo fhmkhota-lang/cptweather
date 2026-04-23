@@ -2,16 +2,20 @@ import sys
 from datetime import datetime, timezone
 from weather import (
     get_weather, parse_weather, get_uv_index,
-    get_forecast, check_rain_soon, get_weekend_forecast, check_fire_danger
+    get_forecast, check_rain_soon, get_weekend_forecast,
+    check_fire_danger, get_week_ahead
 )
-from tweet import compose_tweet, compose_weekend_tweet, post_tweet
+from tweet import compose_tweet, compose_weekend_tweet, compose_week_ahead_tweet, post_tweet
 
 
 def is_friday_evening():
-    """Check if it's Friday (post the weekend forecast on Friday evening)."""
     now = datetime.now(tz=timezone.utc)
-    # Friday = weekday 4, and we're running at 16:00 UTC (18:00 SAST)
-    return now.weekday() == 4
+    return now.weekday() == 4  # Friday
+
+
+def is_sunday_morning():
+    now = datetime.now(tz=timezone.utc)
+    return now.weekday() == 6  # Sunday
 
 
 def main():
@@ -62,6 +66,16 @@ def main():
             print(f"Weekend tweet ({len(weekend_text)} chars):\n{weekend_text}\n")
             weekend_id = post_tweet(weekend_text)
             print(f"✅ Weekend forecast posted! Tweet ID: {weekend_id}")
+
+    # On Sunday morning, post the week ahead
+    if time_of_day == "morning" and is_sunday_morning():
+        print("\nIt's Sunday — posting week ahead forecast...")
+        week = get_week_ahead(forecast_data)
+        if week:
+            week_text = compose_week_ahead_tweet(week)
+            print(f"Week ahead tweet ({len(week_text)} chars):\n{week_text}\n")
+            week_id = post_tweet(week_text)
+            print(f"✅ Week ahead posted! Tweet ID: {week_id}")
 
 
 if __name__ == "__main__":
