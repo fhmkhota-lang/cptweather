@@ -272,3 +272,92 @@ def get_week_ahead(forecast_data: dict) -> list | None:
         })
 
     return results if results else None
+
+
+# Cape Town's main swimming beaches with coordinates
+BEACHES = [
+    {"name": "Muizenberg",  "lat": -34.1087, "lon": 18.4702},
+    {"name": "Camps Bay",   "lat": -33.9507, "lon": 18.3776},
+    {"name": "Clifton",     "lat": -33.9339, "lon": 18.3770},
+    {"name": "Boulders",    "lat": -34.1956, "lon": 18.4504},
+]
+
+
+def get_marine_data(lat: float, lon: float) -> dict | None:
+    """Fetch sea temperature and wave data from Open-Meteo Marine API (no key needed)."""
+    url = "https://marine-api.open-meteo.com/v1/marine"
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current": "sea_surface_temperature,wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period",
+    }
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except Exception:
+        return None
+
+
+def parse_marine(data: dict) -> dict | None:
+    """Extract the key marine fields from Open-Meteo response."""
+    if not data:
+        return None
+    current = data.get("current", {})
+    wave_height = current.get("wave_height")
+    wave_period = current.get("wave_period")
+    swell_height = current.get("swell_wave_height")
+    sea_temp = current.get("sea_surface_temperature")
+    wave_dir_deg = current.get("wave_direction")
+
+    # Wave direction to compass
+    wave_dir = None
+    if wave_dir_deg is not None:
+        directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        wave_dir = directions[round(wave_dir_deg / 45) % 8]
+
+    # Surf rating based on swell height
+    swell = swell_height or wave_height or 0
+    if swell < 0.3:
+        surf_rating = "Flat 😴"
+    elif swell < 0.8:
+        surf_rating = "Small 🤙"
+    elif swell < 1.5:
+        surf_rating = "Fun 🏄"
+    elif swell < 2.5:
+        surf_rating = "Pumping 🔥"
+    else:
+        surf_rating = "Huge — experts only! 💀"
+
+    # Swimming comfort based on sea temp
+    if sea_temp is None:
+        swim_note = ""
+    elif sea_temp >= 20:
+        swim_note = "🟢 Warm"
+    elif sea_temp >= 16:
+        swim_note = "🟡 Cool"
+    elif sea_temp >= 12:
+        swim_note = "🟠 Cold"
+    else:
+        swim_note = "🔴 Freezing"
+
+    return {
+        "sea_temp": round(sea_temp, 1) if sea_temp else None,
+        "wave_height": round(wave_height, 1) if wave_height else None,
+        "wave_period": round(wave_period) if wave_period else None,
+        "swell_height": round(swell_height, 1) if swell_height else None,
+        "wave_dir": wave_dir,
+        "surf_rating": surf_rating,
+        "swim_note": swim_note,
+    }
+
+
+def get_all_beach_data() -> list:
+    """Fetch marine data for all beaches."""
+    results = []
+    for beach in BEACHES:
+        raw = get_marine_data(beach["lat"], beach["lon"])
+        marine = parse_marine(raw)
+        if marine:
+            results.append({"name": beach["name"], **marine})
+    return results

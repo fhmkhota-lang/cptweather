@@ -69,6 +69,23 @@ def compose_tweet(weather: dict, time_of_day: str, uv: float = None,
     return tweet
 
 
+def compose_beach_tweet(beaches: list) -> str:
+    """Build a morning beach conditions tweet."""
+    lines = ["🏖️ Cape Town beach conditions this morning:\n"]
+    for b in beaches:
+        temp_str = f"{b['sea_temp']}°C" if b['sea_temp'] else "N/A"
+        swell_str = f"{b['swell_height']}m" if b['swell_height'] else "N/A"
+        lines.append(
+            f"📍 {b['name']}: {b['swim_note']} {temp_str} | 🌊 {swell_str} — {b['surf_rating']}"
+        )
+    lines.append("\n#CapeTown #BeachLife #CTSurf #Swimming")
+
+    tweet = "\n".join(lines)
+    if len(tweet) > 280:
+        tweet = tweet[:277] + "..."
+    return tweet
+
+
 def compose_week_ahead_tweet(forecast: list) -> str:
     """Build a Sunday week-ahead forecast tweet."""
     lines = ["📅 Good morning, Cape Town! Here's your week ahead:\n"]

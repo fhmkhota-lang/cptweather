@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from weather import (
     get_weather, parse_weather, get_uv_index,
     get_forecast, check_rain_soon, get_weekend_forecast,
-    check_fire_danger, get_week_ahead
+    check_fire_danger, get_week_ahead, get_all_beach_data
 )
-from tweet import compose_tweet, compose_weekend_tweet, compose_week_ahead_tweet, post_tweet
+from tweet import compose_tweet, compose_weekend_tweet, compose_week_ahead_tweet, compose_beach_tweet, post_tweet
 
 
 def is_friday_evening():
@@ -56,6 +56,16 @@ def main():
     print(f"\nComposed tweet ({len(tweet_text)} chars):\n{tweet_text}\n")
     tweet_id = post_tweet(tweet_text)
     print(f"✅ Posted! Tweet ID: {tweet_id}")
+
+    # Every morning, post a second beach conditions tweet
+    if time_of_day == "morning":
+        print("\nFetching beach conditions...")
+        beaches = get_all_beach_data()
+        if beaches:
+            beach_text = compose_beach_tweet(beaches)
+            print(f"Beach tweet ({len(beach_text)} chars):\n{beach_text}\n")
+            beach_id = post_tweet(beach_text)
+            print(f"✅ Beach conditions posted! Tweet ID: {beach_id}")
 
     # On Friday evening, also post the weekend forecast
     if time_of_day == "evening" and is_friday_evening():
