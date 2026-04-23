@@ -1,5 +1,5 @@
 import sys
-from weather import get_weather, parse_weather
+from weather import get_weather, parse_weather, get_uv_index
 from tweet import compose_tweet, post_tweet
 
 
@@ -15,8 +15,16 @@ def main():
     raw = get_weather()
     weather = parse_weather(raw)
     print(f"Weather: {weather['temp']}°C, {weather['description']}")
+    print(f"Wind: {weather['wind_dir']} at {weather['wind_speed']} km/h — Cape Doctor: {weather['cape_doctor']}")
+    print(f"Sunrise: {weather['sunrise']} | Sunset: {weather['sunset']}")
 
-    tweet_text = compose_tweet(weather, time_of_day)
+    # Fetch UV index for morning posts
+    uv = None
+    if time_of_day == "morning":
+        uv = get_uv_index()
+        print(f"UV Index: {uv}")
+
+    tweet_text = compose_tweet(weather, time_of_day, uv)
     print(f"\nComposed tweet ({len(tweet_text)} chars):\n{tweet_text}\n")
 
     tweet_id = post_tweet(tweet_text)
