@@ -24,6 +24,110 @@ def get_weather() -> dict:
     return response.json()
 
 
+def get_forecast() -> dict:
+    """Fetch 5-day forecast from OWM. Returns rain alert and weekend forecast data."""
+    url = "https://api.openweathermap.org/data/2.5/forecast"
+    params = {
+        "lat": LAT,
+        "lon": LON,
+        "appid": OPENWEATHER_API_KEY,
+        "units": "metric",
+        "cnt": 40,  # 5 days x 8 (3-hour intervals)
+    }
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except Exception:
+        return None
+
+
+def check_rain_soon(forecast_data: dict) -> str | None:
+    """Check if rain is expected in the next 6 hours. Returns warning string or None."""
+    if not forecast_data:
+        return None
+    now = datetime.now(tz=timezone.utc)
+    for item in forecast_data.get("list", []):
+        item_time = datetime.fromtimestamp(item["dt"], tz=timezone.utc)
+        hours_ahead = (item_time - now).total_seconds() / 3600
+        if 0 <= hours_ahead <= 6:
+            condition_id = item["weather"][0]["id"]
+            if condition_id < 700:  # Rain, drizzle or thunderstorm
+                desc = item["weather"][0]["description"]
+                hour_sast = (item_time.hour + 2) % 24
+                return f"🌧️ Rain expected around {hour_sast:02d}:00 ({desc}) — grab a brolly!"
+    return None
+
+
+def get_weekend_forecast(forecast_data: dict) -> list | None:
+    """Extract Sat/Sun/Mon daily summaries for the weekend forecast tweet."""
+    if not forecast_data:
+        return None
+
+    from collections import defaultdict
+    daily = defaultdict(list)
+
+    for item in forecast_data.get("list", []):
+        dt = datetime.fromtimestamp(item["dt"], tz=timezone.utc)
+        date_key = dt.date()
+        daily[date_key].append(item)
+
+    today = datetime.now(tz=timezone.utc).date()
+    days = sorted(daily.keys())
+
+    results = []
+    for day in days:
+        if day <= today:
+            continue
+        items = daily[day]
+        temps = [i["main"]["temp"] for i in items]
+        conditions = [i["weather"][0]["id"] for i in items]
+        descriptions = [i["weather"][0]["description"] for i in items]
+
+        # Pick most severe condition of the day
+        min_cond = min(conditions)
+        idx = conditions.index(min_cond)
+        desc = descriptions[idx].capitalize()
+
+        if min_cond < 300:
+            emoji = "⛈️"
+        elif min_cond < 600:
+            emoji = "🌧️"
+        elif min_cond < 800:
+            emoji = "🌫️"
+        elif min_cond == 800:
+            emoji = "☀️"
+        else:
+            emoji = "⛅"
+
+        results.append({
+            "date": day,
+            "day_name": day.strftime("%A"),
+            "min": round(min(temps)),
+            "max": round(max(temps)),
+            "desc": desc,
+            "emoji": emoji,
+        })
+
+        if len(results) == 3:
+            break
+
+    return results if results else None
+
+
+def check_fire_danger(weather: dict) -> str | None:
+    """Return a fire danger warning if conditions are dangerous."""
+    temp = weather["temp"]
+    humidity = weather["humidity"]
+    wind_speed = weather["wind_speed"]
+
+    if temp >= 35 and humidity <= 30 and wind_speed >= 30:
+        return "🔥 EXTREME fire danger — hot, dry & windy conditions. Be vigilant!"
+    elif temp >= 30 and humidity <= 40 and wind_speed >= 20:
+        return "🔥 High fire danger today — avoid open flames outdoors."
+    return None
+
+
 def get_uv_index() -> float:
     """Fetch current UV index from OWM One Call API."""
     url = "https://api.openweathermap.org/data/3.0/onecall"

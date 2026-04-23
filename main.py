@@ -1,6 +1,17 @@
 import sys
-from weather import get_weather, parse_weather, get_uv_index
-from tweet import compose_tweet, post_tweet
+from datetime import datetime, timezone
+from weather import (
+    get_weather, parse_weather, get_uv_index,
+    get_forecast, check_rain_soon, get_weekend_forecast, check_fire_danger
+)
+from tweet import compose_tweet, compose_weekend_tweet, post_tweet
+
+
+def is_friday_evening():
+    """Check if it's Friday (post the weekend forecast on Friday evening)."""
+    now = datetime.now(tz=timezone.utc)
+    # Friday = weekday 4, and we're running at 16:00 UTC (18:00 SAST)
+    return now.weekday() == 4
 
 
 def main():
@@ -18,17 +29,39 @@ def main():
     print(f"Wind: {weather['wind_dir']} at {weather['wind_speed']} km/h — Cape Doctor: {weather['cape_doctor']}")
     print(f"Sunrise: {weather['sunrise']} | Sunset: {weather['sunset']}")
 
-    # Fetch UV index for morning posts
+    # Fetch forecast data (used for rain alert + weekend forecast)
+    print("Fetching forecast data...")
+    forecast_data = get_forecast()
+
+    # Rain alert
+    rain_alert = check_rain_soon(forecast_data)
+    print(f"Rain alert: {rain_alert}")
+
+    # Fire danger
+    fire_warning = check_fire_danger(weather)
+    print(f"Fire danger: {fire_warning}")
+
+    # UV index (morning only)
     uv = None
     if time_of_day == "morning":
         uv = get_uv_index()
         print(f"UV Index: {uv}")
 
-    tweet_text = compose_tweet(weather, time_of_day, uv)
+    # Compose and post the main weather tweet
+    tweet_text = compose_tweet(weather, time_of_day, uv, rain_alert, fire_warning)
     print(f"\nComposed tweet ({len(tweet_text)} chars):\n{tweet_text}\n")
-
     tweet_id = post_tweet(tweet_text)
     print(f"✅ Posted! Tweet ID: {tweet_id}")
+
+    # On Friday evening, also post the weekend forecast
+    if time_of_day == "evening" and is_friday_evening():
+        print("\nIt's Friday — posting weekend forecast...")
+        weekend = get_weekend_forecast(forecast_data)
+        if weekend:
+            weekend_text = compose_weekend_tweet(weekend)
+            print(f"Weekend tweet ({len(weekend_text)} chars):\n{weekend_text}\n")
+            weekend_id = post_tweet(weekend_text)
+            print(f"✅ Weekend forecast posted! Tweet ID: {weekend_id}")
 
 
 if __name__ == "__main__":
